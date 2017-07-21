@@ -1,55 +1,39 @@
-{-# LANGUAGE OverloadedStrings, LambdaCase, ScopedTypeVariables #-}
+{-# LANGUAGE OverloadedStrings, LambdaCase #-}
 
 module Main where
 
 import qualified AcmeRun.Acme as Acme
 import qualified AcmeRun.Lib as Lib
-import qualified AcmeRun.Sh as Sh
-import qualified Data.Text as T
-import qualified Data.Text.IO as TextIO
-import Filesystem.Path.CurrentOS (encodeString)
+import Control.Shell
 import Prelude hiding (FilePath)
-import Turtle
+import System.Exit (exitFailure)
 
-scalaConfigArgs :: FilePath -> Shell [T.Text]
+scalaConfigArgs :: FilePath -> Shell [String]
 scalaConfigArgs checkPath =
   Lib.findDominatingFile [((), ".scalafmt.conf")] checkPath >>= \case
-    Just (_, dir) ->
-      return ["--config", T.pack (encodeString $ dir </> ".scalafmt.conf")]
+    Just (_, dir) -> return ["--config", dir </> ".scalafmt.conf"]
     Nothing -> return []
 
-formatScala :: FilePath -> Shell (Shell Line -> Shell Line)
+formatScala :: FilePath -> Shell ()
 formatScala checkPath = do
-  args <- scalaConfigArgs checkPath
-  return (inproc "scalafmt" ("--stdin":args))
+  confArgs <- scalaConfigArgs checkPath
+  run "scalafmt" ("--stdin" : confArgs)
 
 main :: IO ()
 main =
-  sh $
-  Acme.winid >>= \case
-    Just winid ->
-      (Acme.fileName <$> Acme.tag winid) >>= \case
-        Just winPath ->
-          case extension winPath of
-            Just ".hs" ->
-              Acme.filterBody
-                winid
-                (inproc
-                   "hindent"
-                   ["--style", "gibiansky", "--line-length", "80"])
-            Just ".scala" -> do
-              fmtScala <- formatScala winPath
-              Acme.filterBody winid fmtScala
-            Just ext -> do
-              liftIO
-                (TextIO.putStrLn $ format ("don't know how to format: " %s) ext)
-              exit $ ExitFailure 1
-            Nothing -> do
-              liftIO $ echo "No extension provided on Window filename"
-              exit $ ExitFailure 1
-        Nothing -> do
-          liftIO $ echo "Window has no file name"
-          exit $ ExitFailure 1
-    Nothing -> do
-      liftIO $ echo "Unable to find $winid"
-      exit $ ExitFailure 1
+  shell_ $ do
+    winid <- Acme.winid
+    Acme.fileName <$> Acme.tag winid >>= \case
+      Just winPath ->
+        case takeExtension winPath of
+          ".hs" ->
+            Acme.filterBody
+              winid
+              (run "hindent" ["--style", "gibiansky", "--line-length", "80"])
+          ".scala" -> Acme.filterBody winid $ formatScala winPath
+          ext -> do
+            echo $ "don't know how to format: " ++ ext
+            liftIO exitFailure
+      Nothing -> do
+        echo "Window has no file name"
+        liftIO exitFailure

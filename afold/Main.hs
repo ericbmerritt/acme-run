@@ -1,19 +1,14 @@
-{-# LANGUAGE OverloadedStrings, LambdaCase #-}
+{-# LANGUAGE OverloadedStrings#-}
 
 module Main where
 
 import qualified AcmeRun.Acme as Acme
-import qualified AcmeRun.Sh as Sh
 import qualified AcmeRun.Lib as Lib
+import Control.Shell
 import qualified Data.Text as T
-import Turtle
-  
+
 main :: IO ()
 main =
-  sh $ 
-    Acme.winid >>= \case
-      Just winid -> Acme.filterSelected winid (inproc "fold" ["-w", "80", "-s"])
-      Nothing -> do
-        liftIO $ echo "Unable to find $winid"
-        exit $ ExitFailure 1
-  
+  shell_ $ do
+    winid <- Acme.winid
+    Acme.filterSelected winid (run "fold" ["-w", "80", "-s"])

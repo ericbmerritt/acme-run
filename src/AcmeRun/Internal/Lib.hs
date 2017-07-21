@@ -2,11 +2,9 @@
 
 module AcmeRun.Internal.Lib where
 
-import qualified Control.Foldl as Fold
+import Control.Shell
 import Data.List (foldl)
-import Filesystem.Path (filename, parent)
-import Prelude hiding (FilePath)
-import Turtle
+import System.FilePath (takeDirectory, takeFileName)
 
 type Dominating a = (a, FilePath)
 
@@ -18,7 +16,7 @@ getDominatingType ::
   -> Maybe (Dominating a)
 getDominatingType _parentDir _dominating el@(Just _) _child = el
 getDominatingType parentDir (fileType, dominating) Nothing child =
-  let base = filename child
+  let base = takeFileName child
   in if dominating == base
        then Just (fileType, parentDir)
        else Nothing
@@ -47,8 +45,8 @@ findDominatingFile ::
      (Show a) => [Dominating a] -> FilePath -> Shell (Maybe (a, FilePath))
 findDominatingFile _ "/" = return Nothing
 findDominatingFile dominating currentPath =
-  let parentDirectory = parent currentPath
-  in do children <- fold (ls parentDirectory) Fold.list
+  let parentDirectory = takeDirectory currentPath
+  in do children <- ls parentDirectory
         case searchDirectoryByDominating parentDirectory dominating children of
           Nothing -> findDominatingFile dominating parentDirectory
           el@(Just _) -> return el

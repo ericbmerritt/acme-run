@@ -1,14 +1,11 @@
-{-# LANGUAGE OverloadedStrings, LambdaCase #-}
+{-# LANGUAGE LambdaCase #-}
 
 module Main where
 
 import qualified AcmeRun.Acme as Acme
 import qualified AcmeRun.Lib as Lib
-import qualified AcmeRun.Sh as Sh
-import qualified Data.Text as T
-import qualified Data.Text.IO as TextIO
-import Prelude hiding (FilePath)
-import Turtle
+import Control.Shell hiding (ExitReason)
+import System.Exit (exitFailure)
 
 data Types
   = Makefile
@@ -28,31 +25,22 @@ dominating =
   , (Makefile, "Makefile")
   ]
 
-doBuild :: Shell () -> FilePath -> Shell ()
-doBuild cmd dir = do
-  liftIO $ TextIO.putStrLn (format ("Building in directory " %fp) dir)
-  Sh.chdir dir cmd
-
 build :: FilePath -> Shell ()
 build filename =
   Lib.findDominatingFile dominating filename >>= \case
-    Just (Makefile, dir) -> doBuild (stdout (inproc "make" [] empty)) dir
-    Just (Stack, dir) -> doBuild (stdout (inproc "stack" ["build"] empty)) dir
-    Just (Sbt, dir) -> doBuild (stdout (inproc "sbt" ["compile"] empty)) dir
+    Just (Makefile, dir) -> inDirectory dir $ run "make" []
+    Just (Stack, dir) -> inDirectory dir $ run "stack" ["build"]
+    Just (Sbt, dir) -> inDirectory dir $ run "sbt" ["compile"]
     Nothing -> do
-      liftIO $ echo "Unable to find build file"
-      exit $ ExitFailure 1
+      echo "Unable to find build file"
+      liftIO exitFailure
 
 main :: IO ()
 main =
-  sh $
-  Acme.winid >>= \case
-    Just winid ->
-      Acme.fileName <$> Acme.tag winid >>= \case
-        Just filename -> build filename
-        Nothing -> do
-          liftIO $ echo "Window has no filename"
-          exit $ ExitFailure 1
-    Nothing -> do
-      liftIO $ echo "Unable to get $winid"
-      exit $ ExitFailure 1
+  shell_ $ do
+    winid <- Acme.winid
+    Acme.fileName <$> Acme.tag winid >>= \case
+      Just filename -> build filename
+      Nothing -> do
+        echo "Window has no filename"
+        liftIO exitFailure

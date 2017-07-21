@@ -1,6 +1,13 @@
 Acme-Run
 ========
 
+Status
+------
+![Circle Ci Build Status](https://circleci.com/gh/metadrift/acme-run.svg?style=shield&circle-token=:circle-token
+
+Intro
+-----
+
 This package provides a set of commands that are useful for the [Acme 
 Editor](http://acme.cat-v.org/). 
 
